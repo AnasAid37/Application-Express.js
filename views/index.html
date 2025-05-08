@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Application Cloud Native</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Application Cloud Native avec Express.js</h1>
+            <p>Une application simple démontrant les principes Cloud Native</p>
+        </header>
+        
+        <main>
+            <section class="info-section">
+                <h2>Informations sur le serveur</h2>
+                <div id="server-info">Chargement...</div>
+                <button id="refresh-btn">Actualiser</button>
+            </section>
+            
+            <section class="form-section">
+                <h2>Envoi de données</h2>
+                <form id="data-form">
+                    <div class="form-group">
+                        <label for="name">Nom:</label>
+                        <input type="text" id="name" name="name" required>
+                    </div>
+                    <button type="submit">Envoyer</button>
+                </form>
+                <div id="response"></div>
+            </section>
+        </main>
+        
+        <footer>
+            <p>Projet pour le cours Cloud Native - <a href="/health">État du service</a></p>
+        </footer>
+    </div>
+    
+    <script>
+        async function getServerInfo() {
+            try {
+                const response = await fetch('/api/info');
+                const data = await response.json();
+                
+                const infoDiv = document.getElementById('server-info');
+                infoDiv.innerHTML = `
+                    <div class="info-item">
+                        <span>Nom d'hôte:</span> ${data.hostname}
+                    </div>
+                    <div class="info-item">
+                        <span>Plateforme:</span> ${data.platform}
+                    </div>
+                    <div class="info-item">
+                        <span>CPUs:</span> ${data.cpus}
+                    </div>
+                    <div class="info-item">
+                        <span>Uptime:</span> ${Math.floor(data.uptime / 60)} minutes
+                    </div>
+                    <div class="info-item">
+                        <span>Mémoire totale:</span> ${Math.round(data.memory.total / 1024 / 1024)} MB
+                    </div>
+                    <div class="info-item">
+                        <span>Mémoire libre:</span> ${Math.round(data.memory.free / 1024 / 1024)} MB
+                    </div>
+                    <div class="info-item">
+                        <span>Environnement:</span> ${data.env}
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Erreur:', error);
+                document.getElementById('server-info').innerHTML = 'Erreur lors du chargement des données';
+            }
+        }
+        
+        document.getElementById('data-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const nameInput = document.getElementById('name');
+            const responseDiv = document.getElementById('response');
+            
+            responseDiv.textContent = 'Envoi en cours...';
+            
+            try {
+                const response = await fetch('/api/data', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ name: nameInput.value })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    responseDiv.innerHTML = `
+                        <div class="success">
+                            <p>Données traitées avec succès!</p>
+                            <p>ID: ${result.id}</p>
+                            <p>Timestamp: ${result.timestamp}</p>
+                        </div>
+                    `;
+                    nameInput.value = '';
+                } else {
+                    responseDiv.innerHTML = `
+                        <div class="error">
+                            <p>Erreur: ${result.error}</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Erreur:', error);
+                responseDiv.innerHTML = `
+                    <div class="error">
+                        <p>Erreur de connexion au serveur</p>
+                    </div>
+                `;
+            }
+        });
+        
+        document.addEventListener('DOMContentLoaded', getServerInfo);
+        
+        document.getElementById('refresh-btn').addEventListener('click', getServerInfo);
+    </script>
+</body>
+</html>

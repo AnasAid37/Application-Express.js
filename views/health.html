@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>État du service</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>État du service</h1>
+            <p>Vérification de l'état de santé de l'application</p>
+        </header>
+        
+        <main>
+            <section class="health-section">
+                <div class="health-status">
+                    <div class="status-indicator active"></div>
+                    <div class="status-text">Service opérationnel</div>
+                </div>
+                
+                <div class="health-details">
+                    <h2>Détails</h2>
+                    <div id="health-info">Chargement...</div>
+                </div>
+            </section>
+            
+            <p><a href="/">Retour à l'accueil</a></p>
+        </main>
+        
+        <footer>
+            <p>Projet pour le cours Cloud Native</p>
+        </footer>
+    </div>
+    
+    <script>
+        async function checkHealth() {
+            try {
+                const startTime = performance.now();
+                const response = await fetch('/api/info');
+                const endTime = performance.now();
+                const data = await response.json();
+                
+                const responseTime = Math.round(endTime - startTime);
+                
+                const infoDiv = document.getElementById('health-info');
+                infoDiv.innerHTML = `
+                    <div class="info-item">
+                        <span>État:</span> <span class="status-ok">OK</span>
+                    </div>
+                    <div class="info-item">
+                        <span>Temps de réponse:</span> ${responseTime}ms
+                    </div>
+                    <div class="info-item">
+                        <span>Uptime:</span> ${Math.floor(data.uptime / 60)} minutes
+                    </div>
+                    <div class="info-item">
+                        <span>Mémoire utilisée:</span> ${Math.round((data.memory.total - data.memory.free) / 1024 / 1024)} MB / ${Math.round(data.memory.total / 1024 / 1024)} MB
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Erreur:', error);
+                document.getElementById('health-info').innerHTML = `
+                    <div class="info-item">
+                        <span>État:</span> <span class="status-error">ERREUR</span>
+                    </div>
+                    <div class="info-item">
+                        <span>Détails:</span> Service non disponible
+                    </div>
+                `;
+                
+                const statusIndicator = document.querySelector('.status-indicator');
+                const statusText = document.querySelector('.status-text');
+                
+                statusIndicator.classList.remove('active');
+                statusIndicator.classList.add('inactive');
+                statusText.textContent = 'Service indisponible';
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            checkHealth();
+            setInterval(checkHealth, 10000);
+        });
+    </script>
+</body>
+</html>
