@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestion des Produits</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>Gestion des Produits</h1>
+            <p>Créez, consultez, modifiez et supprimez des produits</p>
+            <nav>
+                <ul>
+                    <li><a href="/">Accueil</a></li>
+                    <li><a href="/products" class="active">Produits</a></li>
+                    <li><a href="/health">État du service</a></li>
+                    <li><a href="/login" id="loginLink">Connexion</a></li>
+                    <li><a href="#" id="logoutLink" style="display: none;">Déconnexion</a></li>
+                </ul>
+            </nav>
+        </header>
+
+        <main>
+            <section class="products-section">
+                <div id="auth-message" class="hidden">
+                    <p>Veuillez vous <a href="/login">connecter</a> pour ajouter ou modifier des produits.</p>
+                </div>
+
+                <div id="product-form" class="hidden">
+                    <h2>Ajouter un nouveau produit</h2>
+                    <form id="add-product-form">
+                        <div class="form-group">
+                            <label for="name">Nom du produit</label>
+                            <input type="text" id="name" name="name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="description">Description</label>
+                            <textarea id="description" name="description" required></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="price">Prix</label>
+                            <input type="number" id="price" name="price" step="0.01" min="0" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="quantity">Quantité</label>
+                            <input type="number" id="quantity" name="quantity" min="0" required>
+                        </div>
+                        <div class="form-group">
+                            <button type="submit" class="btn">Ajouter</button>
+                            <button type="button" id="cancel-edit" class="btn btn-secondary hidden">Annuler</button>
+                        </div>
+                    </form>
+                </div>
+
+                <h2>Liste des produits</h2>
+                <div id="user-info"></div>
+                <div class="product-list" id="product-list">
+                    <p>Chargement des produits...</p>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>Projet pour le cours Cloud Native</p>
+        </footer>
+    </div>
+
+    <script>
+        let editingProductId = null;
+        let currentUser = null;
+
+        // Vérifier si l'utilisateur est connecté
+        function checkAuthStatus() {
+            const token = localStorage.getItem('token');
+            const username = localStorage.getItem('username');
+            const userId = localStorage.getItem('userId');
+            const userRole = localStorage.getItem('userRole');
+
+            console.log("Auth Status Check:", { token, username, userId, userRole });
+
+            if (token && username) {
+                document.getElementById('loginLink').textContent = username;
+                document.getElementById('loginLink').href = '#';
+                document.getElementById('logoutLink').style.display = 'inline-block';
+                document.getElementById('product-form').classList.remove('hidden');
+                document.getElementById('auth-message').classList.add('hidden');
+
+                currentUser = {
+                    id: userId,
+                    username: username,
+                    role: userRole
+                };
+
+                // Afficher les informations de l'utilisateur pour le débogage
+                document.getElementById('user-info').innerHTML = `
+                <div style="background-color: #f8f9fa; padding: 10px; margin-bottom: 15px; border-radius: 5px;">
+                    <p><strong>Utilisateur connecté:</strong> ${username}</p>
+                    <p><strong>ID utilisateur:</strong> ${userId || 'Non défini'}</p>
+                    <p><strong>Rôle:</strong> ${userRole || 'Non défini'}</p>
+                </div>
+            `;
+
+                console.log("Current User:", currentUser);
+            } else {
+                document.getElementById('loginLink').textContent = 'Connexion';
+                document.getElementById('loginLink').href = '/login';
+                document.getElementById('logoutLink').style.display = 'none';
+                document.getElementById('product-form').classList.add('hidden');
+                document.getElementById('auth-message').classList.remove('hidden');
+                document.getElementById('user-info').innerHTML = '';
+
+                currentUser = null;
+                console.log("No user logged in");
+            }
+        }
+
+        // Charger tous les produits
+        async function loadProducts() {
+            try {
+                const response = await fetch('/api/products');
+
+                if (!response.ok) {
+                    throw new Error('Erreur réseau');
+                }
+
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    const productList = document.getElementById('product-list');
+
+                    if (data.data.length === 0) {
+                        productList.innerHTML = '<p>Aucun produit disponible.</p>';
+                        return;
+                    }
+
+                    let html = '';
+                    data.data.forEach(product => {
+                        // Debugging: Afficher les informations de l'utilisateur et du produit
+                        console.log("Product:", product);
+                        console.log("Product Owner:", product.user);
+                        console.log("Current User:", currentUser);
+
+                        // CORRECTION: Permettre la modification à tous les utilisateurs connectés
+                        const canEdit = currentUser !== null;
+
+                        console.log("Can edit product?", canEdit);
+
+                        html += `
+                        <div class="product-card" data-id="${product._id}">
+                            <h3>${product.name}</h3>
+                            <p class="product-description">${product.description}</p>
+                            <div class="product-details">
+                                <p><strong>Prix:</strong> ${product.price}€</p>
+                                <p><strong>Quantité:</strong> ${product.quantity}</p>
+                                <p><small>ID Propriétaire: ${product.user}</small></p>
+                            </div>
+                            <div class="product-actions">
+                                ${canEdit ? `
+                                    <button class="btn btn-small edit-btn" data-id="${product._id}">Modifier</button>
+                                    <button class="btn btn-small btn-danger delete-btn" data-id="${product._id}">Supprimer</button>
+                                ` : `<p><small>Vous n'avez pas les droits pour modifier ce produit</small></p>`}
+                            </div>
+                        </div>
+                    `;
+                    });
+
+                    productList.innerHTML = html;
+
+                    // Ajouter les événements pour les boutons d'édition et de suppression
+                    document.querySelectorAll('.edit-btn').forEach(button => {
+                        button.addEventListener('click', handleEditProduct);
+                        console.log("Ajout événement édition pour", button.getAttribute('data-id'));
+                    });
+
+                    document.querySelectorAll('.delete-btn').forEach(button => {
+                        button.addEventListener('click', handleDeleteProduct);
+                        console.log("Ajout événement suppression pour", button.getAttribute('data-id'));
+                    });
+                } else {
+                    document.getElementById('product-list').innerHTML = '<p>Erreur lors du chargement des produits.</p>';
+                }
+            } catch (error) {
+                console.error('Erreur:', error);
+                document.getElementById('product-list').innerHTML = '<p>Erreur lors du chargement des produits.</p>';
+            }
+        }
+
+        // Ajouter ou modifier un produit
+        async function handleProductSubmit(event) {
+            event.preventDefault();
+
+            const name = document.getElementById('name').value;
+            const description = document.getElementById('description').value;
+            const price = parseFloat(document.getElementById('price').value);
+            const quantity = parseInt(document.getElementById('quantity').value);
+
+            const productData = {
+                name,
+                description,
+                price,
+                quantity
+            };
+
+            const token = localStorage.getItem('token');
+
+            if (!token) {
+                alert('Vous devez être connecté pour effectuer cette action.');
+                return;
+            }
+
+            try {
+                let url = '/api/products';
+                let method = 'POST';
+
+                if (editingProductId) {
+                    url = `/api/products/${editingProductId}`;
+                    method = 'PUT';
+                }
+
+                console.log(`${method} request to ${url} with data:`, productData);
+
+                const response = await fetch(url, {
+                    method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(productData)
+                });
+
+                const data = await response.json();
+                console.log("API Response:", data);
+
+                if (data.status === 'success') {
+                    // Réinitialiser le formulaire
+                    document.getElementById('add-product-form').reset();
+                    document.getElementById('cancel-edit').classList.add('hidden');
+                    document.querySelector('#product-form h2').textContent = 'Ajouter un nouveau produit';
+
+                    // Réinitialiser l'état d'édition
+                    editingProductId = null;
+
+                    // Actualiser la liste des produits
+                    loadProducts();
+
+                    alert(editingProductId ? 'Produit mis à jour avec succès!' : 'Produit ajouté avec succès!');
+                } else {
+                    alert(`Erreur: ${data.message || 'Une erreur est survenue'}`);
+                }
+            } catch (error) {
+                console.error('Erreur:', error);
+                alert('Une erreur est survenue lors de la soumission du formulaire.');
+            }
+        }
+
+        // Gestionnaire pour l'édition d'un produit
+        async function handleEditProduct(event) {
+            const productId = event.target.getAttribute('data-id');
+            console.log("Édition du produit ID:", productId);
+
+            try {
+                const response = await fetch(`/api/products/${productId}`);
+                const data = await response.json();
+                console.log("Données du produit:", data);
+
+                if (data.status === 'success') {
+                    const product = data.data;
+
+                    // Remplir le formulaire avec les données du produit
+                    document.getElementById('name').value = product.name;
+                    document.getElementById('description').value = product.description;
+                    document.getElementById('price').value = product.price;
+                    document.getElementById('quantity').value = product.quantity;
+
+                    // Changer le titre du formulaire
+                    document.querySelector('#product-form h2').textContent = 'Modifier le produit';
+
+                    // Afficher le bouton d'annulation
+                    document.getElementById('cancel-edit').classList.remove('hidden');
+
+                    // Définir l'ID du produit en cours d'édition
+                    editingProductId = productId;
+
+                    // Faire défiler jusqu'au formulaire
+                    document.getElementById('product-form').scrollIntoView({ behavior: 'smooth' });
+                } else {
+                    alert(`Erreur: ${data.message || 'Une erreur est survenue'}`);
+                }
+            } catch (error) {
+                console.error('Erreur:', error);
+                alert('Une erreur est survenue lors de la récupération des données du produit.');
+            }
+        }
+
+        // Annuler l'édition
+        document.getElementById('cancel-edit').addEventListener('click', () => {
+            editingProductId = null;
+            document.getElementById('add-product-form').reset();
+            document.querySelector('#product-form h2').textContent = 'Ajouter un nouveau produit';
+            document.getElementById('cancel-edit').classList.add('hidden');
+        });
+
+        // Suppression d'un produit
+        // Fonction de suppression de produit corrigée
+        async function handleDeleteProduct(event) {
+            try {
+                const productId = event.target.getAttribute('data-id');
+                console.log("Tentative de suppression du produit ID:", productId);
+
+                if (!productId) {
+                    console.error("ID de produit non trouvé");
+                    alert("Erreur: ID de produit manquant");
+                    return;
+                }
+
+                const confirmDelete = confirm('Êtes-vous sûr de vouloir supprimer ce produit ?');
+                if (!confirmDelete) return;
+
+                const token = localStorage.getItem('token');
+                if (!token) {
+                    alert('Vous devez être connecté pour supprimer un produit.');
+                    return;
+                }
+
+                // Journaliser les détails avant l'envoi de la requête
+                console.log("URL de suppression:", `/api/products/${productId}`);
+                console.log("Token:", token ? "Présent" : "Absent");
+
+                // Envoyer la requête DELETE
+                const response = await fetch(`/api/products/${productId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                console.log("Statut de la réponse:", response.status);
+
+                // Vérifier si la réponse est au format JSON
+                const contentType = response.headers.get('content-type');
+                let data;
+
+                if (contentType && contentType.includes('application/json')) {
+                    data = await response.json();
+                    console.log("Données de réponse:", data);
+                } else {
+                    console.log("Réponse non-JSON reçue");
+                }
+
+                // Considérer la suppression réussie si le statut est 200 OK, 204 No Content ou si data.status est 'success'
+                if (response.ok || (data && data.status === 'success')) {
+                    console.log("Suppression réussie");
+                    alert('Produit supprimé avec succès.');
+
+                    // Actualiser la liste des produits
+                    loadProducts();
+                } else {
+                    const errorMessage = data ? data.message : 'Erreur réseau lors de la suppression';
+                    console.error("Erreur de suppression:", errorMessage);
+                    alert(`Erreur: ${errorMessage}`);
+                }
+            } catch (error) {
+                console.error('Erreur lors de la suppression:', error);
+                alert(`Une erreur est survenue: ${error.message}`);
+            }
+        }
+
+        // Déconnexion
+        document.getElementById('logoutLink').addEventListener('click', (e) => {
+            e.preventDefault();
+            localStorage.removeItem('token');
+            localStorage.removeItem('username');
+            localStorage.removeItem('userId');
+            localStorage.removeItem('userRole');
+            checkAuthStatus();
+            loadProducts();
+            alert('Vous avez été déconnecté.');
+        });
+
+        // Initialiser
+        document.getElementById('add-product-form').addEventListener('submit', handleProductSubmit);
+        document.addEventListener('DOMContentLoaded', () => {
+            checkAuthStatus();
+            loadProducts();
+        });
+    </script>
+</body>
+
+</html>

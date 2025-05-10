@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connexion - Application Cloud Native</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Connexion</h1>
+            <p>Accédez à votre compte Cloud Native</p>
+            <nav>
+                <ul>
+                    <li><a href="/">Accueil</a></li>
+                    <li><a href="/products">Produits</a></li>
+                    <li><a href="/health">État du service</a></li>
+                    <li><a href="/login" class="active">Connexion</a></li>
+                    <li><a href="/register">Inscription</a></li>
+                </ul>
+            </nav>
+        </header>
+        
+        <main>
+            <section class="auth-section">
+                <div class="form-container">
+                    <h2>Connectez-vous à votre compte</h2>
+                    <div id="error-message" class="error-message hidden"></div>
+                    
+                    <form id="login-form">
+                        <div class="form-group">
+                            <label for="email">Email</label>
+                            <input type="email" id="email" name="email" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="password">Mot de passe</label>
+                            <input type="password" id="password" name="password" required>
+                        </div>
+                        <button type="submit" class="btn-primary">Se connecter</button>
+                    </form>
+                    
+                    <div class="auth-links">
+                        <p>Vous n'avez pas de compte? <a href="/register">Inscrivez-vous</a></p>
+                    </div>
+                </div>
+            </section>
+        </main>
+        
+        <footer>
+            <p>Projet pour le cours Cloud Native - <a href="/health">État du service</a></p>
+        </footer>
+    </div>
+    
+    <script>
+        function showError(message) {
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.textContent = message;
+            errorDiv.classList.remove('hidden');
+            
+            // Masquer le message après 5 secondes
+            setTimeout(() => {
+                errorDiv.classList.add('hidden');
+            }, 5000);
+        }
+        
+        async function loginUser(credentials) {
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(credentials)
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    // Enregistrer le token et le nom d'utilisateur
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('username', data.user.username);
+                    
+                    // Rediriger vers la page d'accueil
+                    window.location.href = '/';
+                } else {
+                    throw new Error(data.message || 'Erreur lors de la connexion');
+                }
+            } catch (error) {
+                console.error('Erreur:', error);
+                showError(error.message || 'Erreur lors de la connexion');
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            // Vérifier si l'utilisateur est déjà connecté
+            const token = localStorage.getItem('token');
+            if (token) {
+                // Rediriger vers la page d'accueil
+                window.location.href = '/';
+                return;
+            }
+            
+            // Gestionnaire du formulaire de connexion
+            document.getElementById('login-form').addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                
+                // Envoyer les données de connexion
+                loginUser({
+                    email,
+                    password
+                });
+            });
+        });
+    </script>
+</body>
+</html>

@@ -11,6 +11,15 @@
         <header>
             <h1>État du service</h1>
             <p>Vérification de l'état de santé de l'application</p>
+            <nav>
+                <ul>
+                    <li><a href="/">Accueil</a></li>
+                    <li><a href="/products">Produits</a></li>
+                    <li><a href="/health" class="active">État du service</a></li>
+                    <li><a href="/login" id="loginLink">Connexion</a></li>
+                    <li><a href="#" id="logoutLink" style="display: none;">Déconnexion</a></li>
+                </ul>
+            </nav>
         </header>
         
         <main>
@@ -25,8 +34,6 @@
                     <div id="health-info">Chargement...</div>
                 </div>
             </section>
-            
-            <p><a href="/">Retour à l'accueil</a></p>
         </main>
         
         <footer>
@@ -35,6 +42,22 @@
     </div>
     
     <script>
+        // Vérifier si l'utilisateur est connecté
+        function checkAuthStatus() {
+            const token = localStorage.getItem('token');
+            const username = localStorage.getItem('username');
+            
+            if (token && username) {
+                document.getElementById('loginLink').textContent = username;
+                document.getElementById('loginLink').href = '#';
+                document.getElementById('logoutLink').style.display = 'inline-block';
+            } else {
+                document.getElementById('loginLink').textContent = 'Connexion';
+                document.getElementById('loginLink').href = '/login';
+                document.getElementById('logoutLink').style.display = 'none';
+            }
+        }
+        
         async function checkHealth() {
             try {
                 const startTime = performance.now();
@@ -65,23 +88,25 @@
                     <div class="info-item">
                         <span>État:</span> <span class="status-error">ERREUR</span>
                     </div>
-                    <div class="info-item">
-                        <span>Détails:</span> Service non disponible
+                    <div class<div class="info-item">
+                        <span>Message:</span> Impossible de récupérer l'état du service.
                     </div>
                 `;
-                
-                const statusIndicator = document.querySelector('.status-indicator');
-                const statusText = document.querySelector('.status-text');
-                
-                statusIndicator.classList.remove('active');
-                statusIndicator.classList.add('inactive');
-                statusText.textContent = 'Service indisponible';
             }
         }
-        
-        document.addEventListener('DOMContentLoaded', () => {
+
+        // Gérer la déconnexion
+        document.getElementById('logoutLink').addEventListener('click', function (e) {
+            e.preventDefault();
+            localStorage.removeItem('token');
+            localStorage.removeItem('username');
+            window.location.href = '/';
+        });
+
+        // Initialisation lors du chargement de la page
+        window.addEventListener('DOMContentLoaded', () => {
+            checkAuthStatus();
             checkHealth();
-            setInterval(checkHealth, 10000);
         });
     </script>
 </body>
